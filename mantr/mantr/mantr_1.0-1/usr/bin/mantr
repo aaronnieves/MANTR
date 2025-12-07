@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# mantr — Traductor automático de páginas man
+
+VERSION="1.0"
+
+# Directorio donde está este script (sirve tanto en desarrollo como instalado)
+/usr/bin/readlink >/dev/null 2>&1 && READLINK=readlink || READLINK=readlink
+BASEDIR="$(dirname "$($READLINK -f "$0")")"
+
+show_help() {
+    cat <<EOF
+mantr $VERSION — Traductor automático de páginas man
+
+Uso:
+  mantr <comando> [idioma]    Traduce la página man de <comando> al idioma indicado
+                              (por defecto: es)
+
+Opciones:
+  mantr --help                Muestra esta ayuda
+  mantr --version             Muestra la versión instalada
+  mantr --clear-cache         Elimina la caché de traducciones
+  mantr --show-cache          Muestra la ruta y contenido de la caché
+
+Ejemplos:
+  mantr ls                    Traduce 'ls' al español
+  mantr ls es                 Español
+  mantr ls fr                 Francés (si hay modelo Argos en→fr instalado)
+
+Variables de entorno:
+  BACKEND          Backend de traducción (por defecto: argos)
+  MANTR_CACHE_DIR  Ruta personalizada para la caché (por defecto: ~/.cache/mantr)
+EOF
+}
+
+show_version() {
+    echo "mantr versión $VERSION"
+}
+
+clear_cache() {
+    CACHE_DIR="${MANTR_CACHE_DIR:-$HOME/.cache/mantr}"
+
+    echo "Eliminando caché en: $CACHE_DIR"
+    if [ -d "$CACHE_DIR" ]; then
+        rm -rf "$CACHE_DIR"
+        echo "✔ Caché eliminada."
+    else
+        echo "No existe la carpeta de caché, nada que borrar."
+    fi
+}
+
+show_cache() {
+    CACHE_DIR="${MANTR_CACHE_DIR:-$HOME/.cache/mantr}"
+
+    echo "Caché (MANTR_CACHE_DIR): ${MANTR_CACHE_DIR:-(no definida)}"
+    echo "Ruta efectiva de caché: $CACHE_DIR"
+
+    if [ -d "$CACHE_DIR" ]; then
+        echo
+        echo "Archivos en caché:"
+        ls -1 "$CACHE_DIR"
+    else
+        echo
+        echo "No existe la carpeta de caché (aún no se ha traducido nada o ya se ha borrado)."
+    fi
+}
+
+# Opciones internas (no traducen nada, solo gestionan la herramienta)
+case "$1" in
+    --help)
+        show_help
+        exit 0
+        ;;
+    --version)
+        show_version
+        exit 0
+        ;;
+    --clear-cache)
+        clear_cache
+        exit 0
+        ;;
+    --show-cache)
+        show_cache
+        exit 0
+        ;;
+esac
+
+# Si no hay argumentos, mostramos uso breve
+if [ -z "$1" ]; then
+    echo "Uso: mantr <comando> [idioma]" >&2
+    echo "Prueba 'mantr --help' para más información." >&2
+    exit 1
+fi
+
+cmd="$1"
+shift
+
+# Idioma destino (por defecto: es)
+lang="${1:-es}"
+
+# Esto lo usará mantr_consume.py para nombrar la caché
+export MANTR_CMD="$cmd"
+
+# Backend por defecto (nos quedamos con Argos)
+BACKEND="${BACKEND:-argos}"
+
+# Pipeline:
+# 1) mantr_regex.sh llama a man y parsea en bloques
+# 2) mantr_consume.py traduce y formatea como man
+"$BASEDIR/mantr_regex.sh" "$cmd" \
+  | BACKEND="$BACKEND" python3 "$BASEDIR/mantr_consume.py" "$lang"

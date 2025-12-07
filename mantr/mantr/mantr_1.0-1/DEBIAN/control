@@ -1,0 +1,10 @@
+Package: mantr
+Version: 1.0-1
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: Aaron Nieves
+Depends: python3, python3-pip, man-db, less
+Description: Traductor automático de páginas man al español
+ mantr actúa como un wrapper de man y traduce las páginas usando Argos Translate.
+ Mantiene un formato similar al de man, detecta opciones complejas y guarda caché.
